@@ -1,18 +1,14 @@
 use std::path::PathBuf;
 
-use chrono::Utc;
-
 use crate::config::AppConfig;
 use crate::db::Database;
 use crate::error::{RepoHopError, Result};
 use crate::launch;
-use crate::paths::display_path;
+use crate::paths::{display_path, AppPaths};
 use crate::project::{ensure_cwd_project, ensure_projects_indexed, list_ranked_projects, Project};
-use crate::provider::{detect_installed, provider_by_id, DetectedAgent, ProviderId};
-use crate::ui::picker::{
-    pick_list, pick_project_table, resolve_user_path, PickItem, PickOutcome, ProjectRow,
-};
-use crate::ui::timefmt::format_relative_time;
+use crate::provider::provider_by_id;
+use crate::ui::hop::{run_hop_ui, HopChoice};
+use crate::update;
 
 pub struct HopOptions {
     /// If set, skip project picker and use this path.
@@ -20,6 +16,9 @@ pub struct HopOptions {
 }
 
 pub fn run_interactive(db: &Database, config: &AppConfig, opts: HopOptions) -> Result<()> {
+    // Soft auto-update check (network, rate-limited).
+    let update_banner = check_update_banner();
+
     // First run / empty index: pull projects from agent session metadata.
     if opts.project.is_none() {
         match ensure_projects_indexed(db, config) {
@@ -35,37 +34,95 @@ pub fn run_interactive(db: &Database, config: &AppConfig, opts: HopOptions) -> R
                 );
             }
             Ok(_) => {}
-            Err(RepoHopError::NoProjects { .. }) => {
-                // Fall through — select_project allows . / n even when empty.
-            }
+            Err(RepoHopError::NoProjects { .. }) => {}
             Err(e) => return Err(e),
         }
     }
 
-    let project = if let Some(p) = opts.project {
+    let (projects, start_at_agents) = if let Some(p) = opts.project {
         if !p.is_dir() {
             return Err(RepoHopError::ProjectMissing(p));
         }
-        ensure_cwd_project(db, &p)?
+        (vec![ensure_cwd_project(db, &p)?], true)
     } else {
-        select_project(db)?
+        (load_projects(db), false)
     };
 
-    let agents = detect_installed();
-    if agents.is_empty() {
-        return Err(RepoHopError::NoAgents);
+    let choice = run_hop_ui(db, projects, update_banner, start_at_agents)?;
+    launch_choice(db, choice)
+}
+
+fn load_projects(db: &Database) -> Vec<Project> {
+    let projects = list_ranked_projects(db).unwrap_or_default();
+    let mut alive: Vec<_> = projects.iter().filter(|p| p.exists()).cloned().collect();
+    let missing: Vec<_> = projects.into_iter().filter(|p| !p.exists()).collect();
+    alive.extend(missing);
+    alive
+}
+
+fn check_update_banner() -> Option<String> {
+    let paths = AppPaths::resolve().ok()?;
+    let info = update::maybe_auto_check(&paths)?;
+    if !info.update_available {
+        return None;
     }
+    // Auto-download + install when a newer GitHub release exists (rate-limited).
+    // Set REPOPHOP_NO_UPDATE=1 to skip; REPOPHOP_UPDATE_CHECK_ONLY=1 for banner only.
+    if std::env::var_os("REPOPHOP_UPDATE_CHECK_ONLY").is_some() {
+        return Some(format!(
+            "Update available: {} → {}  ·  run `rhop update --apply`",
+            info.current, info.latest_version
+        ));
+    }
+    match update::apply_update(&info) {
+        Ok(path) => Some(format!(
+            "Updated {} → {} at {} — restart rhop to use it",
+            info.current,
+            info.latest_version,
+            path.display()
+        )),
+        Err(e) => {
+            tracing::warn!(error = %e, "auto-update apply failed");
+            Some(format!(
+                "Update {} → {} failed ({e})  ·  try `rhop update --apply`",
+                info.current, info.latest_version
+            ))
+        }
+    }
+}
 
-    let provider_id = select_agent(&project, &agents)?;
-    let provider = provider_by_id(provider_id);
+fn launch_choice(db: &Database, choice: HopChoice) -> Result<()> {
+    match choice {
+        HopChoice::New { project, provider } => {
+            let p = provider_by_id(provider);
+            println!(
+                "Launching {} (new) in {}",
+                p.display_name(),
+                display_path(&project.path)
+            );
+            let status = launch::launch_new_session(db, p.as_ref(), &project.path)?;
+            report_status(status);
+        }
+        HopChoice::Resume {
+            project,
+            provider,
+            session,
+        } => {
+            let p = provider_by_id(provider);
+            println!(
+                "Resuming {} session «{}» in {}",
+                p.display_name(),
+                session.title,
+                display_path(&project.path)
+            );
+            let status = launch::launch_resume_session(db, p.as_ref(), &project.path, &session)?;
+            report_status(status);
+        }
+    }
+    Ok(())
+}
 
-    println!(
-        "Launching {} in {}",
-        provider.display_name(),
-        display_path(&project.path)
-    );
-
-    let status = launch::launch_new_session(db, provider.as_ref(), &project.path)?;
+fn report_status(status: std::process::ExitStatus) {
     if !status.success() {
         eprintln!(
             "Agent exited with status {}",
@@ -75,84 +132,4 @@ pub fn run_interactive(db: &Database, config: &AppConfig, opts: HopOptions) -> R
                 .unwrap_or_else(|| "signal".into())
         );
     }
-    Ok(())
-}
-
-fn select_project(db: &Database) -> Result<Project> {
-    let projects = list_ranked_projects(db).unwrap_or_default();
-    let projects: Vec<Project> = {
-        let mut alive: Vec<_> = projects.iter().filter(|p| p.exists()).cloned().collect();
-        let missing: Vec<_> = projects.into_iter().filter(|p| !p.exists()).collect();
-        // Existing paths first; rank already applied within the full list.
-        alive.extend(missing);
-        alive
-    };
-
-    let now = Utc::now();
-    let rows: Vec<ProjectRow> = projects
-        .iter()
-        .map(|p| {
-            let mut name = p.name.clone();
-            if p.is_favorite {
-                name = format!("★ {name}");
-            }
-            if !p.exists() {
-                name = format!("[?] {name}");
-            }
-            ProjectRow {
-                name,
-                path: display_path(&p.path),
-                last_used: format_relative_time(now, p.last_launched_at),
-            }
-        })
-        .collect();
-
-    let outcome = pick_project_table("Select project", &rows, 0)?;
-    match outcome {
-        PickOutcome::Index(idx) => {
-            let project = projects
-                .get(idx)
-                .cloned()
-                .ok_or_else(|| RepoHopError::Config("invalid project index".into()))?;
-            if !project.exists() {
-                return Err(RepoHopError::ProjectMissing(project.path));
-            }
-            Ok(project)
-        }
-        PickOutcome::Cwd => {
-            let cwd = std::env::current_dir().map_err(RepoHopError::Io)?;
-            if !cwd.is_dir() {
-                return Err(RepoHopError::ProjectMissing(cwd));
-            }
-            ensure_cwd_project(db, &cwd)
-        }
-        PickOutcome::NewPath(raw) => {
-            let path = resolve_user_path(&raw)?;
-            if !path.is_dir() {
-                return Err(RepoHopError::ProjectMissing(path));
-            }
-            ensure_cwd_project(db, &path)
-        }
-    }
-}
-
-fn select_agent(project: &Project, agents: &[DetectedAgent]) -> Result<ProviderId> {
-    let default_idx = project
-        .last_provider
-        .and_then(|lp| agents.iter().position(|a| a.provider == lp))
-        .unwrap_or(0);
-
-    let items: Vec<PickItem> = agents
-        .iter()
-        .map(|a| {
-            let ver = a.version.clone().unwrap_or_default();
-            PickItem {
-                label: a.provider.as_str().to_string(),
-                detail: format!("{}  {}", ver, a.executable.display()),
-            }
-        })
-        .collect();
-
-    let idx = pick_list("Select agent (new session)", &items, default_idx)?;
-    Ok(agents[idx].provider)
 }

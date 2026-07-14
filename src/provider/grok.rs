@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use crate::error::{RepoHopError, Result};
+use crate::error::Result;
 use crate::provider::command_spec::CommandSpec;
 use crate::provider::detect::{find_on_path, run_version};
+use crate::provider::sessions_grok;
 use crate::provider::traits::{
     AgentProvider, DetectedAgent, LaunchContext, ProviderCapabilities, ProviderId, SessionSummary,
 };
@@ -27,7 +28,6 @@ impl AgentProvider for GrokProvider {
         let executable = find_on_path(self.binary_names())?;
         let version = self.version(&executable).ok();
         let mut notes = Vec::new();
-        // Common install: %USERPROFILE%\.grok\bin\grok.exe
         if executable
             .components()
             .any(|c| c.as_os_str().eq_ignore_ascii_case(".grok"))
@@ -49,20 +49,17 @@ impl AgentProvider for GrokProvider {
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
             new_session: true,
-            // Stage 2: resume via -c/-r not wired in UI yet.
-            resume_session: false,
-            list_sessions: false,
+            resume_session: true,
+            list_sessions: true,
         }
     }
 
-    fn list_sessions(&self, _project: &Path) -> Result<Vec<SessionSummary>> {
-        Ok(Vec::new())
+    fn list_sessions(&self, project: &Path) -> Result<Vec<SessionSummary>> {
+        Ok(sessions_grok::list_sessions_for_project(project))
     }
 
     fn build_new_command(&self, ctx: &LaunchContext) -> Result<CommandSpec> {
         let detected = self.detect()?;
-        // Prefer process cwd (CommandSpec.current_dir) like other providers.
-        // Grok also accepts --cwd; we rely on current_dir for consistency.
         Ok(CommandSpec::new(
             detected.executable,
             Vec::new(),
@@ -72,11 +69,14 @@ impl AgentProvider for GrokProvider {
 
     fn build_resume_command(
         &self,
-        _ctx: &LaunchContext,
-        _session: &SessionSummary,
+        ctx: &LaunchContext,
+        session: &SessionSummary,
     ) -> Result<CommandSpec> {
-        Err(RepoHopError::NotImplemented(
-            "Grok session resume (Stage 3)",
+        let detected = self.detect()?;
+        Ok(CommandSpec::new(
+            detected.executable,
+            vec!["--resume".into(), session.id.clone()],
+            ctx.project_path.clone(),
         ))
     }
 
@@ -110,7 +110,6 @@ fn percent_decode_to_bytes(input: &str) -> Option<Vec<u8>> {
                 i += 3;
             }
             b'+' => {
-                // Treat + as literal plus (path encoding uses %20 for space).
                 out.push(b'+');
                 i += 1;
             }

@@ -5,6 +5,10 @@ pub mod detect;
 pub mod grok;
 pub mod opencode;
 pub mod registry;
+pub mod sessions_claude;
+pub mod sessions_codex;
+pub mod sessions_grok;
+pub mod sessions_opencode;
 pub mod traits;
 
 pub use command_spec::CommandSpec;

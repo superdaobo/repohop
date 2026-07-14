@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-14
+
+### Added
+
+- **Unified multi-level TUI** (single alternate screen): project → tool → chats (no tear-down between levels)
+- Agent table columns: **Tool | Last used | Uses** (per-project launch stats)
+- Session / chat picker with **＋ New chat** (key `n`) and resume for Codex / Claude / OpenCode / Grok
+- `rhop update` / `rhop update --apply` — check and install from GitHub Releases
+- Soft auto-update banner on startup (rate-limited; disable with `REPOPHOP_NO_UPDATE`)
+
+### Changed
+
+- Interactive hop no longer opens a second TUI after project pick
+- Provider adapters expose list/resume sessions (Stage 3 UI embedded in hop)
+
 ## [0.1.2] - 2026-07-14
 
 ### Added

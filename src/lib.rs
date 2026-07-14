@@ -13,5 +13,6 @@ pub mod paths;
 pub mod project;
 pub mod provider;
 pub mod ui;
+pub mod update;
 
 pub use error::{RepoHopError, Result};

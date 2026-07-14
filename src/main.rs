@@ -11,6 +11,7 @@ use repohop::logging;
 use repohop::paths::AppPaths;
 use repohop::project::scan_and_upsert;
 use repohop::ui::{run_interactive, HopOptions};
+use repohop::update;
 
 fn main() -> ExitCode {
     match real_main() {
@@ -87,7 +88,8 @@ fn real_main() -> repohop::Result<()> {
         }
         Some(Commands::Sessions) => {
             eprintln!(
-                "rhop sessions is not implemented yet (Stage 3).\nSee GitHub issues for Codex/Claude/OpenCode session adapters."
+                "Session browser is built into interactive `rhop` (project → tool → chats).\n\
+                 Stage 3 standalone `rhop sessions` CLI may return later."
             );
             Err(RepoHopError::NotImplemented("rhop sessions"))
         }
@@ -97,6 +99,7 @@ fn real_main() -> repohop::Result<()> {
             );
             Err(RepoHopError::NotImplemented("rhop worktree"))
         }
+        Some(Commands::Update { apply }) => update::run_update_cli(apply),
         None => {
             let project = cli.project.map(|p| {
                 if p.as_os_str() == "." {

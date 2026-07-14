@@ -19,13 +19,13 @@ pub enum RepoHopError {
 
     #[error(
         "no projects found from agent history or config.\n  \
-         RepoHop looks for Codex/Claude/OpenCode session folders automatically.\n  \
+         RepoHop looks for Codex/Claude/OpenCode/Grok session folders automatically.\n  \
          Optional: add project_roots in {config} and run `rhop scan`\n  \
          Or: `rhop .` from inside a project directory"
     )]
     NoProjects { config: PathBuf },
 
-    #[error("no AI coding agents found on PATH; install Codex, Claude Code, or OpenCode")]
+    #[error("no AI coding agents found on PATH; install Codex, Claude Code, OpenCode, or Grok")]
     NoAgents,
 
     #[error("feature not implemented yet: {0}")]
@@ -45,6 +45,9 @@ pub enum RepoHopError {
 
     #[error("failed to launch agent: {0}")]
     Launch(String),
+
+    #[error("update error: {0}")]
+    Update(String),
 
     #[error(transparent)]
     Io(#[from] std::io::Error),

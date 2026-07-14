@@ -63,11 +63,19 @@ cargo build --release
 ```powershell
 rhop doctor   # see agents + auto-discovered projects
 rhop scan     # refresh project list from agent session history
-rhop          # pick a project + agent and launch (table: Name | Path | Last used)
+rhop          # multi-level hop: project → tool → chat
 rhop .        # use current directory as project
+rhop update   # check GitHub for a newer release
+rhop update --apply  # download and install
 ```
 
-In the project picker: **↑/↓** move, **Enter** select, **.** = cwd, **n**/**a** = add a path, **Esc** cancel. Projects are sorted by most recent use.
+Interactive flow stays in **one** screen:
+
+1. **Project** — Name | Path | Last used · `.` = cwd · `n`/`a` = path  
+2. **Tool** — Tool | Last used | Uses  
+3. **Chat** — resume a session or **＋ New chat** (`n`)
+
+Updates: on startup RepoHop rate-limits a GitHub check and **auto-downloads** a newer release when found. Disable with `REPOPHOP_NO_UPDATE=1`, or banner-only with `REPOPHOP_UPDATE_CHECK_ONLY=1`. Manual: `rhop update` / `rhop update --apply`.
 
 RepoHop **automatically** finds projects by reading (read-only) local metadata from:
 

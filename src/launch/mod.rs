@@ -19,6 +19,20 @@ pub fn launch_new_session(
     record_and_run(db, provider.id(), project_path, &spec, "new")
 }
 
+/// Resume an existing agent session.
+pub fn launch_resume_session(
+    db: &Database,
+    provider: &dyn AgentProvider,
+    project_path: &std::path::Path,
+    session: &crate::provider::SessionSummary,
+) -> Result<std::process::ExitStatus> {
+    let ctx = LaunchContext {
+        project_path: project_path.to_path_buf(),
+    };
+    let spec = provider.build_resume_command(&ctx, session)?;
+    record_and_run(db, provider.id(), project_path, &spec, "resume")
+}
+
 fn record_and_run(
     db: &Database,
     provider: ProviderId,

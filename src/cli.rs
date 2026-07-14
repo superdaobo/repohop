@@ -30,6 +30,12 @@ pub enum Commands {
     Worktree,
     /// Show configuration path and project_roots
     Config,
+    /// Check for (and optionally install) updates from GitHub Releases
+    Update {
+        /// Download and replace the current binary when a newer release exists
+        #[arg(long)]
+        apply: bool,
+    },
     /// Print version
     Version,
 }

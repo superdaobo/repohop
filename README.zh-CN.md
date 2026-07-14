@@ -63,11 +63,19 @@ cargo build --release
 ```powershell
 rhop doctor   # 查看 Agent 与自动发现的项目
 rhop scan     # 从各 Agent 会话元数据刷新项目列表
-rhop          # 选项目 + Agent 并启动（表格：名称 | 路径 | 最近使用）
+rhop          # 多级跳转：项目 → 工具 → 会话
 rhop .        # 以当前目录为项目
+rhop update   # 检查 GitHub 是否有新版本
+rhop update --apply  # 下载并安装
 ```
 
-项目选择器：**↑/↓** 移动，**Enter** 选定，**.** = 当前目录，**n**/**a** = 输入新路径，**Esc** 取消。列表按最近使用时间排序（越近越靠上）。
+交互全程在**同一屏**内切换，不再反复开关界面：
+
+1. **项目** — 名称 | 路径 | 最近使用 · `.` = 当前目录 · `n`/`a` = 输入路径  
+2. **工具** — 工具 | 最近使用 | 次数  
+3. **会话** — 恢复历史，或 **＋ 新建对话**（快捷键 `n`）
+
+更新：启动时会限频检查 GitHub，发现新版本会**自动下载安装**。`REPOPHOP_NO_UPDATE=1` 关闭；`REPOPHOP_UPDATE_CHECK_ONLY=1` 仅提示。手动：`rhop update` / `rhop update --apply`。
 
 RepoHop 会**自动、只读**读取本机会话元数据来发现项目：
 

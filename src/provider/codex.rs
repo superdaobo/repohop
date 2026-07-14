@@ -1,8 +1,9 @@
 use std::path::Path;
 
-use crate::error::{RepoHopError, Result};
+use crate::error::Result;
 use crate::provider::command_spec::CommandSpec;
 use crate::provider::detect::{find_on_path, run_version};
+use crate::provider::sessions_codex;
 use crate::provider::traits::{
     AgentProvider, DetectedAgent, LaunchContext, ProviderCapabilities, ProviderId, SessionSummary,
 };
@@ -48,14 +49,13 @@ impl AgentProvider for CodexProvider {
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
             new_session: true,
-            // Stage 2: not wired in UI; CLI supports resume.
-            resume_session: false,
-            list_sessions: false,
+            resume_session: true,
+            list_sessions: true,
         }
     }
 
-    fn list_sessions(&self, _project: &Path) -> Result<Vec<SessionSummary>> {
-        Ok(Vec::new())
+    fn list_sessions(&self, project: &Path) -> Result<Vec<SessionSummary>> {
+        Ok(sessions_codex::list_sessions_for_project(project))
     }
 
     fn build_new_command(&self, ctx: &LaunchContext) -> Result<CommandSpec> {
@@ -69,11 +69,14 @@ impl AgentProvider for CodexProvider {
 
     fn build_resume_command(
         &self,
-        _ctx: &LaunchContext,
-        _session: &SessionSummary,
+        ctx: &LaunchContext,
+        session: &SessionSummary,
     ) -> Result<CommandSpec> {
-        Err(RepoHopError::NotImplemented(
-            "Codex session resume (Stage 3)",
+        let detected = self.detect()?;
+        Ok(CommandSpec::new(
+            detected.executable,
+            vec!["resume".into(), session.id.clone()],
+            ctx.project_path.clone(),
         ))
     }
 

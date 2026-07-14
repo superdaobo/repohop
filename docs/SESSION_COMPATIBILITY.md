@@ -12,7 +12,16 @@ When behavior is unknown, it is marked **UNVERIFIED**. Do not invent flags.
 | Codex CLI | `codex` | `codex` with `cwd=project` | `codex resume [SESSION_ID]` or `--last` | Prefer official resume picker / future CLI; local `~/.codex/sessions` **read-only if needed** |
 | Claude Code | `claude` | `claude` with `cwd=project` | `-c` / `--continue`; `-r` / `--resume [id]` | Project dirs under `~/.claude/projects/` |
 | OpenCode | `opencode` | `opencode` with `cwd=project` | `-c` / `--continue`; `-s` / `--session` | `opencode session list` (verified text table) |
-| Grok Build CLI | `grok` | `grok` with `cwd=project` (also supports `--cwd`) | `-c` / `--continue`; `-r` / `--resume [id]` | Project dirs under `~/.grok/sessions/` (percent-encoded path names) |
+| Grok Build CLI | `grok` | `grok` with `cwd=project` (also supports `--cwd`) | `-c` / `--continue`; `-r` / `--resume [id]` | Project dirs under `~/.grok/sessions/` (percent-encoded path names); per-session `summary.json` |
+
+### Resume commands used by RepoHop (v0.1.3+)
+
+| Provider | New | Resume selected session |
+|----------|-----|-------------------------|
+| Codex | `codex` (cwd) | `codex resume <SESSION_ID>` |
+| Claude | `claude` (cwd) | `claude --resume <SESSION_ID>` |
+| OpenCode | `opencode` (cwd) | `opencode --session <SESSION_ID>` |
+| Grok | `grok` (cwd) | `grok --resume <SESSION_ID>` |
 
 ## Verified versions
 
