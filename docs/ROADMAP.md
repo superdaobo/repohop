@@ -36,10 +36,10 @@
 
 ## Phase 5 — Release
 
-- [ ] Windows x64 release artifacts + SHA-256  
-- [ ] `install.ps1` / `uninstall.ps1`  
-- [ ] GitHub Release  
-- [ ] Install verification  
+- [x] Windows x64 release artifacts + SHA-256 (`.github/workflows/release.yml`)  
+- [x] `install.ps1` / `uninstall.ps1`  
+- [x] GitHub Release (tag `v*` or workflow_dispatch)  
+- [ ] Install verification on clean machine (manual)  
 
 ## Explicit later / out of scope
 

@@ -24,7 +24,30 @@ Session resume, full worktree UX, and install scripts are planned (see [docs/ROA
 - Windows Terminal recommended
 - At least one of: [Codex CLI](https://github.com/openai/codex), [Claude Code](https://code.claude.com), [OpenCode](https://opencode.ai)
 
-## Install (development)
+## Install (Windows)
+
+One-liner (PowerShell 5.1 / 7, no admin):
+
+```powershell
+irm https://raw.githubusercontent.com/superdaobo/repohop/main/install.ps1 | iex
+```
+
+This downloads the latest GitHub Release binary into `%LOCALAPPDATA%\RepoHop\bin` and adds it to your user `PATH`. Open a new terminal, then run `rhop version`.
+
+Pin a version:
+
+```powershell
+$env:REPOPHOP_VERSION = 'v0.1.0'
+irm https://raw.githubusercontent.com/superdaobo/repohop/main/install.ps1 | iex
+```
+
+Uninstall:
+
+```powershell
+irm https://raw.githubusercontent.com/superdaobo/repohop/main/uninstall.ps1 | iex
+```
+
+### Install (development)
 
 ```powershell
 git clone https://github.com/superdaobo/repohop.git

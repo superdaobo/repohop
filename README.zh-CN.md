@@ -24,7 +24,30 @@ RepoHop **不**实现大语言模型、不代理模型 API、不替代各 Agent 
 - 建议使用 Windows Terminal
 - 至少安装 Codex CLI、Claude Code 或 OpenCode 之一
 
-## 开发安装
+## 安装（Windows）
+
+一键安装（PowerShell 5.1 / 7，无需管理员）：
+
+```powershell
+irm https://raw.githubusercontent.com/superdaobo/repohop/main/install.ps1 | iex
+```
+
+会将最新 Release 中的 `rhop.exe` 安装到 `%LOCALAPPDATA%\RepoHop\bin`，并写入用户 `PATH`。新开终端后执行 `rhop version`。
+
+指定版本：
+
+```powershell
+$env:REPOPHOP_VERSION = 'v0.1.0'
+irm https://raw.githubusercontent.com/superdaobo/repohop/main/install.ps1 | iex
+```
+
+卸载：
+
+```powershell
+irm https://raw.githubusercontent.com/superdaobo/repohop/main/uninstall.ps1 | iex
+```
+
+### 开发安装
 
 ```powershell
 git clone https://github.com/superdaobo/repohop.git
