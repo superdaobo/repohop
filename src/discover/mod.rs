@@ -83,7 +83,7 @@ pub fn merge_discovered(items: Vec<DiscoveredProject>) -> Vec<DiscoveredProject>
             .or_insert(item);
     }
     let mut out: Vec<_> = map.into_values().collect();
-    out.sort_by(|a, b| b.last_activity.cmp(&a.last_activity));
+    out.sort_by_key(|b| std::cmp::Reverse(b.last_activity));
     out
 }
 

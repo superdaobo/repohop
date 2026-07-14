@@ -163,7 +163,7 @@ pub fn decode_claude_project_dirname(name: &str) -> Option<String> {
         let bytes = s.as_bytes();
         if bytes[0].is_ascii_alphabetic() && &s[1..3] == "--" {
             let drive = s.chars().next()?.to_ascii_uppercase();
-            s = format!("{drive}:\\{}", &s[3..].replace('-', "\\"));
+            s = format!("{drive}:\\{}", s[3..].replace('-', "\\"));
             // Collapse accidental empty segments from double dashes in names
             while s.contains("\\\\") {
                 s = s.replace("\\\\", "\\");

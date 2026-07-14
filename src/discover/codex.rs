@@ -22,7 +22,7 @@ pub fn discover_projects() -> Result<Vec<DiscoveredProject>> {
     }
 
     let mut files = list_jsonl_files(&root);
-    files.sort_by(|a, b| b.1.cmp(&a.1));
+    files.sort_by_key(|b| std::cmp::Reverse(b.1));
     files.truncate(MAX_FILES);
 
     let mut out = Vec::new();
