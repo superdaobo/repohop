@@ -58,27 +58,22 @@ cargo build --release
 
 ## Quick start
 
-1. Edit config (created on first run):
+**Zero config.** After install, just run:
 
-   `%APPDATA%\RepoHop\config.toml`
+```powershell
+rhop doctor   # see agents + auto-discovered projects
+rhop scan     # refresh project list from agent session history
+rhop          # pick a project + agent and launch
+rhop .        # use current directory as project
+```
 
-   ```toml
-   project_roots = ["D:\\Documents\\Projects"]
-   ```
+RepoHop **automatically** finds projects by reading (read-only) local metadata from:
 
-2. Scan and check agents:
+- Codex: `~/.codex/sessions/**/*.jsonl` (`cwd` in `session_meta`)
+- Claude Code: `~/.claude/projects/**` (`cwd` in session JSONL)
+- OpenCode: `~/.local/share/opencode/opencode.db` (`session.directory`)
 
-   ```powershell
-   rhop doctor
-   rhop scan
-   ```
-
-3. Hop:
-
-   ```powershell
-   rhop        # pick project + agent
-   rhop .      # use current directory as project
-   ```
+Optional: add extra folders under `project_roots` in `%APPDATA%\RepoHop\config.toml` if you want Git-tree scanning beyond agent history.
 
 ## Commands
 

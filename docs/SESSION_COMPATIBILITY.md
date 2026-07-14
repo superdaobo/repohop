@@ -39,12 +39,24 @@ On this machine, npm installs expose:
 | Claude | `%USERPROFILE%\.claude\projects\<encoded-path>\` | Encoding uses path-like segments |
 | OpenCode | `%USERPROFILE%\.local\share\opencode\opencode.db` | Large DB observed; prefer CLI for list when possible |
 
+## Project auto-discovery (v0.1.1+)
+
+RepoHop indexes **project paths only** (not full chat bodies):
+
+| Provider | Source | Field | Notes |
+|----------|--------|-------|-------|
+| Codex | `~/.codex/sessions/**/*.jsonl` | `session_meta.payload.cwd` | First ~8 lines; cap ~400 newest files |
+| Claude | `~/.claude/projects/*/**.jsonl` | `cwd` | Prefer JSONL over encoded folder names |
+| OpenCode | `~/.local/share/opencode/opencode.db` | `session.directory` | Read-only SQLite; group by directory |
+
+`project_roots` remains optional for extra Git scans.
+
 ## Compatibility rules
 
 1. Prefer official CLI / JSON / stable interfaces.
 2. Parse JSONL/SQLite only if official listing is insufficient; **read-only**.
 3. Never modify agent files; never convert sessions across providers.
-4. All path/format assumptions live in `provider/*` and this document.
+4. All path/format assumptions live in `provider/*`, `discover/*`, and this document.
 
 ## Unknowns / risks
 

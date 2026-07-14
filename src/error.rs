@@ -17,7 +17,12 @@ pub enum RepoHopError {
     #[error("project path is not a directory: {0}")]
     ProjectNotDir(PathBuf),
 
-    #[error("no projects available; set project_roots in {config} and run `rhop scan`")]
+    #[error(
+        "no projects found from agent history or config.\n  \
+         RepoHop looks for Codex/Claude/OpenCode session folders automatically.\n  \
+         Optional: add project_roots in {config} and run `rhop scan`\n  \
+         Or: `rhop .` from inside a project directory"
+    )]
     NoProjects { config: PathBuf },
 
     #[error("no AI coding agents found on PATH; install Codex, Claude Code, or OpenCode")]

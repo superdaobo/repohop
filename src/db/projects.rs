@@ -10,6 +10,28 @@ use crate::project::model::Project;
 use crate::provider::ProviderId;
 
 pub fn upsert_scanned_project(conn: &Connection, path: &Path) -> Result<Project> {
+    upsert_project(conn, path, None, None)
+}
+
+/// Upsert a project discovered from agent history.
+///
+/// If `activity` is newer than stored `last_launched_at` and the project was never
+/// launched via RepoHop (`launch_count == 0`), adopt it as the ranking timestamp.
+pub fn upsert_discovered_project(
+    conn: &Connection,
+    path: &Path,
+    provider: ProviderId,
+    activity: Option<DateTime<Utc>>,
+) -> Result<Project> {
+    upsert_project(conn, path, Some(provider), activity)
+}
+
+fn upsert_project(
+    conn: &Connection,
+    path: &Path,
+    provider: Option<ProviderId>,
+    activity: Option<DateTime<Utc>>,
+) -> Result<Project> {
     let path = normalize_path(path);
     let path_str = path.to_string_lossy().to_string();
     let name = path
@@ -17,11 +39,23 @@ pub fn upsert_scanned_project(conn: &Connection, path: &Path) -> Result<Project>
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| path_str.clone());
     let now = Utc::now().to_rfc3339();
+    let activity_s = activity.map(|t| t.to_rfc3339());
+    let provider_s = provider.map(|p| p.as_str().to_string());
 
     if get_by_path(conn, &path)?.is_some() {
+        // Only fill last_launched_at from agent activity when user has never launched via rhop.
         conn.execute(
-            "UPDATE projects SET name = ?1, updated_at = ?2 WHERE path = ?3",
-            params![name, now, path_str],
+            "UPDATE projects SET
+                name = ?1,
+                updated_at = ?2,
+                last_provider = COALESCE(last_provider, ?3),
+                last_launched_at = CASE
+                    WHEN launch_count = 0 AND ?4 IS NOT NULL AND (last_launched_at IS NULL OR last_launched_at < ?4)
+                    THEN ?4
+                    ELSE last_launched_at
+                END
+             WHERE path = ?5",
+            params![name, now, provider_s, activity_s, path_str],
         )
         .map_err(db_err)?;
         return get_by_path(conn, &path)?
@@ -31,8 +65,8 @@ pub fn upsert_scanned_project(conn: &Connection, path: &Path) -> Result<Project>
     let id = Uuid::new_v4().to_string();
     conn.execute(
         "INSERT INTO projects (id, path, name, is_favorite, last_launched_at, launch_count, last_git_activity_at, last_provider, created_at, updated_at)
-         VALUES (?1, ?2, ?3, 0, NULL, 0, NULL, NULL, ?4, ?4)",
-        params![id, path_str, name, now],
+         VALUES (?1, ?2, ?3, 0, ?4, 0, NULL, ?5, ?6, ?6)",
+        params![id, path_str, name, activity_s, provider_s, now],
     )
     .map_err(db_err)?;
     get_by_path(conn, &path)?

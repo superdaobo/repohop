@@ -46,9 +46,25 @@ fn real_main() -> repohop::Result<()> {
             print_report(&report)
         }
         Some(Commands::Scan) => {
-            let n = scan_and_upsert(&db, &config)?;
-            println!("Scanned project_roots; upserted {n} git repositor(ies).");
+            let report = scan_and_upsert(&db, &config)?;
+            println!("Scan complete.");
+            println!(
+                "  from agent sessions: {} ({})",
+                report.from_agents,
+                if report.agent_sources.is_empty() {
+                    "none".into()
+                } else {
+                    report.agent_sources.join(", ")
+                }
+            );
+            println!("  from project_roots:  {}", report.from_roots);
+            println!("  upserted total:     {}", report.total_upserted);
             println!("Database: {}", paths.database_file.display());
+            if report.total_upserted == 0 {
+                println!("Tip: open any project in Codex / Claude / OpenCode once, then re-run `rhop scan`.");
+            } else {
+                println!("Run `rhop` to pick a project and start an agent.");
+            }
             Ok(())
         }
         Some(Commands::Config) => {
@@ -56,9 +72,11 @@ fn real_main() -> repohop::Result<()> {
             println!("Database:    {}", paths.database_file.display());
             println!("Log dir:     {}", paths.log_dir.display());
             println!("Worktrees:   {}", paths.worktree_root.display());
+            println!();
+            println!("Auto-discovery: ON (Codex ~/.codex/sessions, Claude ~/.claude/projects, OpenCode opencode.db)");
             println!("project_roots ({}):", config.project_roots.len());
             if config.project_roots.is_empty() {
-                println!("  (empty — edit the config file, then run `rhop scan`)");
+                println!("  (empty — optional; agent history is enough for zero-config)");
             } else {
                 for r in &config.project_roots {
                     println!("  - {}", r.display());
@@ -87,7 +105,7 @@ fn real_main() -> repohop::Result<()> {
                     p
                 }
             });
-            run_interactive(&db, HopOptions { project })
+            run_interactive(&db, &config, HopOptions { project })
         }
     }
 }

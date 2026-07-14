@@ -8,14 +8,16 @@ use crate::paths::AppPaths;
 
 const DEFAULT_CONFIG_TEMPLATE: &str = r#"# RepoHop configuration
 # Docs: https://github.com/superdaobo/repohop
-
-# Directories to scan for Git repositories (used by `rhop scan`).
-# Example (Windows):
+#
+# Zero-config by default: `rhop` / `rhop scan` auto-discover projects from
+# Codex, Claude Code, and OpenCode local session metadata (read-only).
+#
+# Optional: extra folders to scan for Git repos:
 # project_roots = ["D:\\Documents\\Projects", "C:\\Users\\you\\code"]
 project_roots = []
 
 [scan]
-# Maximum directory depth under each project root.
+# Maximum directory depth under each project root (only used with project_roots).
 max_depth = 4
 "#;
 

@@ -7,12 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-14
+
+### Added
+
+- **Zero-config project discovery** from agent session metadata (read-only):
+  - Codex `session_meta.cwd` in `~/.codex/sessions`
+  - Claude Code `cwd` in `~/.claude/projects`
+  - OpenCode `session.directory` in `opencode.db`
+- `rhop` auto-imports projects on first run when the local index is empty
+- `rhop scan` / `rhop doctor` report discovery sources without requiring `project_roots`
+
+### Changed
+
+- `project_roots` is optional; empty config is valid
+
+## [0.1.0] - 2026-07-14
+
 ### Added
 
 - GitHub Actions **Release** workflow: Windows x64 `rhop.exe`, SHA-256, attach to GitHub Release.
 - `install.ps1` / `uninstall.ps1` one-liner install from latest (or pinned) release.
-
-## [0.1.0] - 2026-07-14
 
 ### Added
 

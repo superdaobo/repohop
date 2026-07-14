@@ -58,25 +58,22 @@ cargo build --release
 
 ## 快速开始
 
-1. 编辑配置（首次运行自动创建）：`%APPDATA%\RepoHop\config.toml`
+**零配置。** 安装后直接：
 
-   ```toml
-   project_roots = ["D:\\Documents\\Projects"]
-   ```
+```powershell
+rhop doctor   # 查看 Agent 与自动发现的项目
+rhop scan     # 从各 Agent 会话元数据刷新项目列表
+rhop          # 选项目 + Agent 并启动
+rhop .        # 以当前目录为项目
+```
 
-2. 检测与扫描：
+RepoHop 会**自动、只读**读取本机会话元数据来发现项目：
 
-   ```powershell
-   rhop doctor
-   rhop scan
-   ```
+- Codex：`~/.codex/sessions/**/*.jsonl`
+- Claude Code：`~/.claude/projects/**`
+- OpenCode：`~/.local/share/opencode/opencode.db`
 
-3. 启动：
-
-   ```powershell
-   rhop
-   rhop .
-   ```
+可选：在 `%APPDATA%\RepoHop\config.toml` 的 `project_roots` 中增加额外扫描目录。
 
 ## 命令
 
