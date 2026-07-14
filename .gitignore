@@ -1,0 +1,25 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local env / secrets
+.env
+.env.*
+*.pem
+
+# RepoHop local runtime (never commit user data)
+.repohop/
+
+# Test artifacts
+/tmp/
+*.log
