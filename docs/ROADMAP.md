@@ -9,18 +9,18 @@
 ## Phase 1 — Architecture & foundation
 
 - [x] Product docs (PRD, ARCHITECTURE, ROADMAP, …)  
-- [ ] Rust crate + module boundaries  
-- [ ] fmt / clippy / test / CI  
-- [ ] Errors + logging  
+- [x] Rust crate + module boundaries  
+- [x] fmt / clippy / test / CI  
+- [x] Errors + logging  
 
 ## Phase 2 — Minimal runnable loop
 
-- [ ] `rhop doctor` + provider detection  
-- [ ] `project_roots` + `rhop scan`  
-- [ ] Project selection (Ratatui)  
-- [ ] Agent selection  
-- [ ] Launch **new** session  
-- [ ] Persist launch history  
+- [x] `rhop doctor` + provider detection  
+- [x] `project_roots` + `rhop scan`  
+- [x] Project selection (Ratatui)  
+- [x] Agent selection  
+- [x] Launch **new** session  
+- [x] Persist launch history  
 
 ## Phase 3 — Session resume
 
