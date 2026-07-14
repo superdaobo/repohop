@@ -9,6 +9,7 @@ pub enum ProviderId {
     Codex,
     Claude,
     OpenCode,
+    Grok,
 }
 
 impl ProviderId {
@@ -17,6 +18,7 @@ impl ProviderId {
             Self::Codex => "codex",
             Self::Claude => "claude",
             Self::OpenCode => "opencode",
+            Self::Grok => "grok",
         }
     }
 
@@ -25,12 +27,25 @@ impl ProviderId {
             "codex" => Some(Self::Codex),
             "claude" | "claude-code" => Some(Self::Claude),
             "opencode" | "open-code" => Some(Self::OpenCode),
+            "grok" | "grok-build" | "grok-cli" => Some(Self::Grok),
             _ => None,
         }
     }
 
     pub fn all() -> &'static [ProviderId] {
-        &[Self::Codex, Self::Claude, Self::OpenCode]
+        &[Self::Codex, Self::Claude, Self::OpenCode, Self::Grok]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_grok_aliases() {
+        assert_eq!(ProviderId::parse("grok"), Some(ProviderId::Grok));
+        assert_eq!(ProviderId::parse("grok-build"), Some(ProviderId::Grok));
+        assert_eq!(ProviderId::parse("Grok"), Some(ProviderId::Grok));
     }
 }
 

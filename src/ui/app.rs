@@ -1,13 +1,18 @@
 use std::path::PathBuf;
 
+use chrono::Utc;
+
 use crate::config::AppConfig;
 use crate::db::Database;
 use crate::error::{RepoHopError, Result};
 use crate::launch;
 use crate::paths::display_path;
-use crate::project::{ensure_projects_indexed, list_ranked_projects, Project};
+use crate::project::{ensure_cwd_project, ensure_projects_indexed, list_ranked_projects, Project};
 use crate::provider::{detect_installed, provider_by_id, DetectedAgent, ProviderId};
-use crate::ui::picker::{pick_list, PickItem};
+use crate::ui::picker::{
+    pick_list, pick_project_table, resolve_user_path, PickItem, PickOutcome, ProjectRow,
+};
+use crate::ui::timefmt::format_relative_time;
 
 pub struct HopOptions {
     /// If set, skip project picker and use this path.
@@ -31,8 +36,7 @@ pub fn run_interactive(db: &Database, config: &AppConfig, opts: HopOptions) -> R
             }
             Ok(_) => {}
             Err(RepoHopError::NoProjects { .. }) => {
-                // Fall through — select_project will surface a clear error,
-                // or user can still use rhop .
+                // Fall through — select_project allows . / n even when empty.
             }
             Err(e) => return Err(e),
         }
@@ -42,7 +46,7 @@ pub fn run_interactive(db: &Database, config: &AppConfig, opts: HopOptions) -> R
         if !p.is_dir() {
             return Err(RepoHopError::ProjectMissing(p));
         }
-        crate::project::ensure_cwd_project(db, &p)?
+        ensure_cwd_project(db, &p)?
     } else {
         select_project(db)?
     };
@@ -75,49 +79,61 @@ pub fn run_interactive(db: &Database, config: &AppConfig, opts: HopOptions) -> R
 }
 
 fn select_project(db: &Database) -> Result<Project> {
-    let projects = list_ranked_projects(db)?;
-    // Prefer existing paths in the list, but still show missing.
+    let projects = list_ranked_projects(db).unwrap_or_default();
     let projects: Vec<Project> = {
         let mut alive: Vec<_> = projects.iter().filter(|p| p.exists()).cloned().collect();
         let missing: Vec<_> = projects.into_iter().filter(|p| !p.exists()).collect();
-        if alive.is_empty() && missing.is_empty() {
-            return Err(RepoHopError::NoProjects {
-                config: crate::paths::AppPaths::resolve()
-                    .map(|p| p.config_file)
-                    .unwrap_or_else(|_| PathBuf::from("config.toml")),
-            });
-        }
-        // Put existing first (rank already applied within each group via prior sort)
+        // Existing paths first; rank already applied within the full list.
         alive.extend(missing);
         alive
     };
 
-    let items: Vec<PickItem> = projects
+    let now = Utc::now();
+    let rows: Vec<ProjectRow> = projects
         .iter()
         .map(|p| {
-            let mut detail = display_path(&p.path);
-            if !p.exists() {
-                detail = format!("[missing] {detail}");
-            }
+            let mut name = p.name.clone();
             if p.is_favorite {
-                detail = format!("★ {detail}");
+                name = format!("★ {name}");
             }
-            if let Some(prov) = p.last_provider {
-                detail = format!("{detail}  · {prov}");
+            if !p.exists() {
+                name = format!("[?] {name}");
             }
-            PickItem {
-                label: p.name.clone(),
-                detail,
+            ProjectRow {
+                name,
+                path: display_path(&p.path),
+                last_used: format_relative_time(now, p.last_launched_at),
             }
         })
         .collect();
 
-    let idx = pick_list("Select project", &items, 0)?;
-    let project = projects[idx].clone();
-    if !project.exists() {
-        return Err(RepoHopError::ProjectMissing(project.path));
+    let outcome = pick_project_table("Select project", &rows, 0)?;
+    match outcome {
+        PickOutcome::Index(idx) => {
+            let project = projects
+                .get(idx)
+                .cloned()
+                .ok_or_else(|| RepoHopError::Config("invalid project index".into()))?;
+            if !project.exists() {
+                return Err(RepoHopError::ProjectMissing(project.path));
+            }
+            Ok(project)
+        }
+        PickOutcome::Cwd => {
+            let cwd = std::env::current_dir().map_err(RepoHopError::Io)?;
+            if !cwd.is_dir() {
+                return Err(RepoHopError::ProjectMissing(cwd));
+            }
+            ensure_cwd_project(db, &cwd)
+        }
+        PickOutcome::NewPath(raw) => {
+            let path = resolve_user_path(&raw)?;
+            if !path.is_dir() {
+                return Err(RepoHopError::ProjectMissing(path));
+            }
+            ensure_cwd_project(db, &path)
+        }
     }
-    Ok(project)
 }
 
 fn select_agent(project: &Project, agents: &[DetectedAgent]) -> Result<ProviderId> {

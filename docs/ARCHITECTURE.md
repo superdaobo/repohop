@@ -33,7 +33,7 @@ RepoHop is a Rust CLI (`rhop`) that routes the user to an external AI coding age
 ## Key data structures
 
 - **`CommandSpec`**: `executable`, `args`, `cwd`, `env`, `display_command`
-- **`ProviderId`**: `Codex`, `Claude`, `OpenCode` (+ reserved extension points)
+- **`ProviderId`**: `Codex`, `Claude`, `OpenCode`, `Grok` (+ reserved extension points)
 - **`DetectedAgent`**: provider, path, version, notes
 - **`Project`**: path, name, favorite, launch stats
 - **`LaunchRecord`**: project, provider, mode, time, display command

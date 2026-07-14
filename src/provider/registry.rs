@@ -1,6 +1,7 @@
 use crate::error::{RepoHopError, Result};
 use crate::provider::claude::ClaudeProvider;
 use crate::provider::codex::CodexProvider;
+use crate::provider::grok::GrokProvider;
 use crate::provider::opencode::OpenCodeProvider;
 use crate::provider::traits::{AgentProvider, DetectedAgent, ProviderId};
 
@@ -10,6 +11,7 @@ pub fn all_providers() -> Vec<Box<dyn AgentProvider>> {
         Box::new(CodexProvider),
         Box::new(ClaudeProvider),
         Box::new(OpenCodeProvider),
+        Box::new(GrokProvider),
     ]
 }
 
@@ -18,6 +20,7 @@ pub fn provider_by_id(id: ProviderId) -> Box<dyn AgentProvider> {
         ProviderId::Codex => Box::new(CodexProvider),
         ProviderId::Claude => Box::new(ClaudeProvider),
         ProviderId::OpenCode => Box::new(OpenCodeProvider),
+        ProviderId::Grok => Box::new(GrokProvider),
     }
 }
 

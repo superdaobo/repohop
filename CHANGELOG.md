@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-14
+
+### Added
+
+- **Grok Build CLI** provider (`grok` / `grok-build` / `grok-cli`) for new-session launch
+- Read-only project discovery from `~/.grok/sessions/<percent-encoded-path>/`
+- Interactive project **table**: columns **Name | Path | Last used** (aligned)
+- Picker shortcuts: `.` = current directory, `n`/`a` = type a new project path
+
+### Changed
+
+- Project sort is **recency-first** (`last_launched_at` desc); favorites no longer jump the list (★ still shown)
+- Relative last-used labels: `just now`, `5m ago`, `3h ago`, `2d ago`, `never`
+
 ## [0.1.1] - 2026-07-14
 
 ### Added

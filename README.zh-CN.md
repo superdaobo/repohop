@@ -2,7 +2,7 @@
 
 **一键跳进正确的仓库、Agent 与会话。**
 
-RepoHop（命令：`rhop`）是面向 AI 编程 CLI 的**本地优先**工作区路由与会话/任务管理器。在 PowerShell 中输入 `rhop`，即可选择最近项目、选择 Codex / Claude Code / OpenCode，并启动新会话（后续支持继续历史会话与独立 Git Worktree）。
+RepoHop（命令：`rhop`）是面向 AI 编程 CLI 的**本地优先**工作区路由与会话/任务管理器。在 PowerShell 中输入 `rhop`，即可选择最近项目、选择 Codex / Claude Code / OpenCode / Grok Build CLI，并启动新会话（后续支持继续历史会话与独立 Git Worktree）。
 
 RepoHop **不**实现大语言模型、不代理模型 API、不替代各 Agent CLI。它只负责项目发现、Agent 检测、会话索引、Git Worktree 管理、启动命令构造与本地历史。
 
@@ -22,7 +22,7 @@ RepoHop **不**实现大语言模型、不代理模型 API、不替代各 Agent 
 - Windows 11 x86_64（首要）
 - PowerShell 7 或 Windows PowerShell 5.1
 - 建议使用 Windows Terminal
-- 至少安装 Codex CLI、Claude Code 或 OpenCode 之一
+- 至少安装 Codex CLI、Claude Code、OpenCode 或 Grok Build CLI 之一
 
 ## 安装（Windows）
 
@@ -63,15 +63,18 @@ cargo build --release
 ```powershell
 rhop doctor   # 查看 Agent 与自动发现的项目
 rhop scan     # 从各 Agent 会话元数据刷新项目列表
-rhop          # 选项目 + Agent 并启动
+rhop          # 选项目 + Agent 并启动（表格：名称 | 路径 | 最近使用）
 rhop .        # 以当前目录为项目
 ```
+
+项目选择器：**↑/↓** 移动，**Enter** 选定，**.** = 当前目录，**n**/**a** = 输入新路径，**Esc** 取消。列表按最近使用时间排序（越近越靠上）。
 
 RepoHop 会**自动、只读**读取本机会话元数据来发现项目：
 
 - Codex：`~/.codex/sessions/**/*.jsonl`
 - Claude Code：`~/.claude/projects/**`
 - OpenCode：`~/.local/share/opencode/opencode.db`
+- Grok Build CLI：`~/.grok/sessions/<百分号编码路径>/`
 
 可选：在 `%APPDATA%\RepoHop\config.toml` 的 `project_roots` 中增加额外扫描目录。
 

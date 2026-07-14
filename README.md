@@ -2,7 +2,7 @@
 
 **Hop into the right repo, agent, and session.**
 
-RepoHop (`rhop`) is a **local-first workspace router** for AI coding CLIs. It helps you pick a recent project, choose Codex / Claude Code / OpenCode, and start a session in the right directory—optionally in an isolated Git worktree (roadmap).
+RepoHop (`rhop`) is a **local-first workspace router** for AI coding CLIs. It helps you pick a recent project, choose Codex / Claude Code / OpenCode / Grok Build CLI, and start a session in the right directory—optionally in an isolated Git worktree (roadmap).
 
 RepoHop does **not** run models, proxy APIs, or replace agent CLIs. It only handles project discovery, agent detection, session indexing, safe worktree management, launch command construction, and local history.
 
@@ -22,7 +22,7 @@ Session resume, full worktree UX, and install scripts are planned (see [docs/ROA
 - Windows 11 x86_64 (primary)
 - PowerShell 7 or Windows PowerShell 5.1
 - Windows Terminal recommended
-- At least one of: [Codex CLI](https://github.com/openai/codex), [Claude Code](https://code.claude.com), [OpenCode](https://opencode.ai)
+- At least one of: [Codex CLI](https://github.com/openai/codex), [Claude Code](https://code.claude.com), [OpenCode](https://opencode.ai), [Grok Build CLI](https://grok.x.ai)
 
 ## Install (Windows)
 
@@ -63,15 +63,18 @@ cargo build --release
 ```powershell
 rhop doctor   # see agents + auto-discovered projects
 rhop scan     # refresh project list from agent session history
-rhop          # pick a project + agent and launch
+rhop          # pick a project + agent and launch (table: Name | Path | Last used)
 rhop .        # use current directory as project
 ```
+
+In the project picker: **↑/↓** move, **Enter** select, **.** = cwd, **n**/**a** = add a path, **Esc** cancel. Projects are sorted by most recent use.
 
 RepoHop **automatically** finds projects by reading (read-only) local metadata from:
 
 - Codex: `~/.codex/sessions/**/*.jsonl` (`cwd` in `session_meta`)
 - Claude Code: `~/.claude/projects/**` (`cwd` in session JSONL)
 - OpenCode: `~/.local/share/opencode/opencode.db` (`session.directory`)
+- Grok Build CLI: `~/.grok/sessions/<percent-encoded-path>/`
 
 Optional: add extra folders under `project_roots` in `%APPDATA%\RepoHop\config.toml` if you want Git-tree scanning beyond agent history.
 

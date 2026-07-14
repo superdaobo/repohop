@@ -1,11 +1,13 @@
 use crate::project::model::Project;
 
-/// Sort projects for the picker: favorite, last launch, count, name.
+/// Sort projects for the picker: most recent activity first.
+///
+/// Order: `last_launched_at` desc (nulls last), then launch_count desc, name, path.
+/// Favorites are marked in the UI (★) but do not jump the recency order.
 pub fn rank_projects(mut projects: Vec<Project>) -> Vec<Project> {
     projects.sort_by(|a, b| {
-        b.is_favorite
-            .cmp(&a.is_favorite)
-            .then_with(|| b.last_launched_at.cmp(&a.last_launched_at))
+        b.last_launched_at
+            .cmp(&a.last_launched_at)
             .then_with(|| b.launch_count.cmp(&a.launch_count))
             .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
             .then_with(|| a.path.cmp(&b.path))
@@ -54,12 +56,13 @@ mod tests {
     }
 
     #[test]
-    fn favorite_first() {
+    fn recency_beats_favorite() {
         let ranked = rank_projects(vec![
-            proj("a", false, 10, Some(100)),
-            proj("b", true, 0, None),
+            proj("a", false, 1, Some(1000)),
+            proj("b", true, 99, None),
         ]);
-        assert_eq!(ranked[0].name, "b");
+        assert_eq!(ranked[0].name, "a");
+        assert_eq!(ranked[1].name, "b");
     }
 
     #[test]
@@ -69,6 +72,16 @@ mod tests {
             proj("new", false, 1, Some(1000)),
         ]);
         assert_eq!(ranked[0].name, "new");
+    }
+
+    #[test]
+    fn null_last_launched_sorts_last() {
+        let ranked = rank_projects(vec![
+            proj("never", false, 50, None),
+            proj("used", false, 1, Some(100)),
+        ]);
+        assert_eq!(ranked[0].name, "used");
+        assert_eq!(ranked[1].name, "never");
     }
 
     #[test]

@@ -4,6 +4,7 @@
 
 mod claude;
 mod codex;
+mod grok;
 mod opencode;
 
 use std::collections::HashMap;
@@ -47,6 +48,13 @@ pub fn discover_from_agents() -> Result<Vec<DiscoveredProject>> {
             all.append(&mut v);
         }
         Err(e) => tracing::warn!(error = %e, "opencode discovery failed"),
+    }
+    match grok::discover_projects() {
+        Ok(mut v) => {
+            tracing::info!(count = v.len(), "grok discovery");
+            all.append(&mut v);
+        }
+        Err(e) => tracing::warn!(error = %e, "grok discovery failed"),
     }
     Ok(merge_discovered(all))
 }
@@ -112,6 +120,7 @@ pub fn agent_data_hints() -> Vec<(ProviderId, PathBuf)> {
                 .join("opencode")
                 .join("opencode.db"),
         ));
+        out.push((ProviderId::Grok, home.join(".grok").join("sessions")));
     }
     out
 }

@@ -2,6 +2,7 @@ pub mod claude;
 pub mod codex;
 pub mod command_spec;
 pub mod detect;
+pub mod grok;
 pub mod opencode;
 pub mod registry;
 pub mod traits;
