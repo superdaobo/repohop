@@ -323,11 +323,7 @@ fn loop_ui(
 /// Double-click window for mouse activation (same as Enter).
 const DOUBLE_CLICK_MS: u128 = 400;
 
-fn handle_mouse(
-    db: &Database,
-    st: &mut HopState,
-    mouse: MouseEvent,
-) -> Result<Option<HopChoice>> {
+fn handle_mouse(db: &Database, st: &mut HopState, mouse: MouseEvent) -> Result<Option<HopChoice>> {
     // Path input has no table list to interact with.
     if matches!(st.screen, Screen::PathInput) {
         return Ok(None);
@@ -356,14 +352,11 @@ fn handle_mouse(
 
             let kind = st.screen.kind();
             let now = std::time::Instant::now();
-            let is_double = st
-                .last_click
-                .as_ref()
-                .is_some_and(|prev| {
-                    prev.screen == kind
-                        && prev.row == row
-                        && now.duration_since(prev.at).as_millis() <= DOUBLE_CLICK_MS
-                });
+            let is_double = st.last_click.as_ref().is_some_and(|prev| {
+                prev.screen == kind
+                    && prev.row == row
+                    && now.duration_since(prev.at).as_millis() <= DOUBLE_CLICK_MS
+            });
             st.last_click = Some(LastClick {
                 screen: kind,
                 row,
@@ -450,10 +443,11 @@ fn row_index_at_click(
     }
     // Inner content after top/left border.
     let inner_y = table_area.y.saturating_add(1);
+    // Bottom border is the last row of the outer area.
     let inner_bottom = table_area
         .y
         .saturating_add(table_area.height)
-        .saturating_sub(1); // exclusive of bottom border
+        .saturating_sub(1);
     // Header is one line at the top of the inner area.
     let body_y = inner_y.saturating_add(1);
     if row < body_y || row >= inner_bottom {
