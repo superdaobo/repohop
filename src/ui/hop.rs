@@ -5,9 +5,11 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use chrono::Utc;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{
+    self, Event, KeyCode, KeyEventKind, MouseButton, MouseEvent, MouseEventKind,
+};
 use ratatui::backend::CrosstermBackend;
-use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState};
 use ratatui::Terminal;
@@ -81,6 +83,37 @@ struct HopState {
     path_input: String,
     status: Option<String>,
     update_banner: Option<String>,
+    /// Last rendered table rect (including borders); used for mouse hit-testing.
+    table_area: Rect,
+    /// Last left-click target for double-click activation.
+    last_click: Option<LastClick>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LastClick {
+    screen: ScreenKind,
+    row: usize,
+    at: std::time::Instant,
+}
+
+/// Cloneable screen identity for double-click tracking (Screen itself holds no data).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ScreenKind {
+    Projects,
+    Agents,
+    Sessions,
+    PathInput,
+}
+
+impl Screen {
+    fn kind(&self) -> ScreenKind {
+        match self {
+            Screen::Projects => ScreenKind::Projects,
+            Screen::Agents => ScreenKind::Agents,
+            Screen::Sessions => ScreenKind::Sessions,
+            Screen::PathInput => ScreenKind::PathInput,
+        }
+    }
 }
 
 /// Run the full hop flow inside a single alternate-screen session.
@@ -122,6 +155,8 @@ pub fn run_hop_ui(
         path_input: String::new(),
         status: None,
         update_banner,
+        table_area: Rect::default(),
+        last_click: None,
     };
 
     if start_at_agents {
@@ -245,38 +280,191 @@ fn loop_ui(
 ) -> Result<HopChoice> {
     loop {
         terminal.draw(|f| draw(f, st)).map_err(RepoHopError::Io)?;
-        // Note: draw takes &mut via interior state fields updated only on keys.
 
         if !event::poll(Duration::from_millis(200)).map_err(RepoHopError::Io)? {
             continue;
         }
-        let Event::Key(key) = event::read().map_err(RepoHopError::Io)? else {
-            continue;
-        };
-        if key.kind != KeyEventKind::Press {
-            continue;
+        match event::read().map_err(RepoHopError::Io)? {
+            Event::Key(key) => {
+                if key.kind != KeyEventKind::Press {
+                    continue;
+                }
+                match st.screen {
+                    Screen::Projects => {
+                        if let Some(choice) = handle_projects(db, st, key.code)? {
+                            return Ok(choice);
+                        }
+                    }
+                    Screen::Agents => {
+                        if let Some(choice) = handle_agents(st, key.code)? {
+                            return Ok(choice);
+                        }
+                    }
+                    Screen::Sessions => {
+                        if let Some(choice) = handle_sessions(st, key.code)? {
+                            return Ok(choice);
+                        }
+                    }
+                    Screen::PathInput => {
+                        handle_path_input(db, st, key.code)?;
+                    }
+                }
+            }
+            Event::Mouse(mouse) => {
+                if let Some(choice) = handle_mouse(db, st, mouse)? {
+                    return Ok(choice);
+                }
+            }
+            _ => {}
         }
+    }
+}
 
-        match st.screen {
-            Screen::Projects => {
-                if let Some(choice) = handle_projects(db, st, key.code)? {
-                    return Ok(choice);
-                }
-            }
-            Screen::Agents => {
-                if let Some(choice) = handle_agents(st, key.code)? {
-                    return Ok(choice);
-                }
-            }
-            Screen::Sessions => {
-                if let Some(choice) = handle_sessions(st, key.code)? {
-                    return Ok(choice);
-                }
-            }
-            Screen::PathInput => {
-                handle_path_input(db, st, key.code)?;
+/// Double-click window for mouse activation (same as Enter).
+const DOUBLE_CLICK_MS: u128 = 400;
+
+fn handle_mouse(
+    db: &Database,
+    st: &mut HopState,
+    mouse: MouseEvent,
+) -> Result<Option<HopChoice>> {
+    // Path input has no table list to interact with.
+    if matches!(st.screen, Screen::PathInput) {
+        return Ok(None);
+    }
+
+    match mouse.kind {
+        MouseEventKind::ScrollDown => {
+            scroll_current(st, 1);
+            Ok(None)
+        }
+        MouseEventKind::ScrollUp => {
+            scroll_current(st, -1);
+            Ok(None)
+        }
+        MouseEventKind::Down(MouseButton::Left) => {
+            let Some(row) = row_index_at_click(
+                st.table_area,
+                mouse.column,
+                mouse.row,
+                current_offset(st),
+                current_len(st),
+            ) else {
+                return Ok(None);
+            };
+            select_current_row(st, row);
+
+            let kind = st.screen.kind();
+            let now = std::time::Instant::now();
+            let is_double = st
+                .last_click
+                .as_ref()
+                .is_some_and(|prev| {
+                    prev.screen == kind
+                        && prev.row == row
+                        && now.duration_since(prev.at).as_millis() <= DOUBLE_CLICK_MS
+                });
+            st.last_click = Some(LastClick {
+                screen: kind,
+                row,
+                at: now,
+            });
+
+            if is_double {
+                activate_current(db, st)
+            } else {
+                Ok(None)
             }
         }
+        _ => Ok(None),
+    }
+}
+
+fn current_len(st: &HopState) -> usize {
+    match st.screen {
+        Screen::Projects => st.project_rows.len(),
+        Screen::Agents => st.agent_rows.len(),
+        Screen::Sessions => st.session_rows.len(),
+        Screen::PathInput => 0,
+    }
+}
+
+fn current_offset(st: &HopState) -> usize {
+    match st.screen {
+        Screen::Projects => st.project_state.offset(),
+        Screen::Agents => st.agent_state.offset(),
+        Screen::Sessions => st.session_state.offset(),
+        Screen::PathInput => 0,
+    }
+}
+
+fn select_current_row(st: &mut HopState, row: usize) {
+    match st.screen {
+        Screen::Projects => st.project_state.select(Some(row)),
+        Screen::Agents => st.agent_state.select(Some(row)),
+        Screen::Sessions => st.session_state.select(Some(row)),
+        Screen::PathInput => {}
+    }
+}
+
+fn scroll_current(st: &mut HopState, delta: i32) {
+    match st.screen {
+        Screen::Projects => move_sel(&mut st.project_state, st.project_rows.len(), delta),
+        Screen::Agents => move_sel(&mut st.agent_state, st.agent_rows.len(), delta),
+        Screen::Sessions => move_sel(&mut st.session_state, st.session_rows.len(), delta),
+        Screen::PathInput => {}
+    }
+}
+
+/// Activate the currently selected row (same as pressing Enter).
+fn activate_current(db: &Database, st: &mut HopState) -> Result<Option<HopChoice>> {
+    match st.screen {
+        Screen::Projects => handle_projects(db, st, KeyCode::Enter),
+        Screen::Agents => handle_agents(st, KeyCode::Enter),
+        Screen::Sessions => handle_sessions(st, KeyCode::Enter),
+        Screen::PathInput => Ok(None),
+    }
+}
+
+/// Map a mouse click to a table data-row index.
+///
+/// Tables use `Borders::ALL` + a 1-line header. Body rows are 1 terminal line each.
+/// Returns `None` if the click is outside the body or past the last row.
+fn row_index_at_click(
+    table_area: Rect,
+    column: u16,
+    row: u16,
+    offset: usize,
+    row_count: usize,
+) -> Option<usize> {
+    if row_count == 0 || table_area.width == 0 || table_area.height == 0 {
+        return None;
+    }
+    // Must be inside the table block (including borders for x/y bounds).
+    if column < table_area.x
+        || column >= table_area.x.saturating_add(table_area.width)
+        || row < table_area.y
+        || row >= table_area.y.saturating_add(table_area.height)
+    {
+        return None;
+    }
+    // Inner content after top/left border.
+    let inner_y = table_area.y.saturating_add(1);
+    let inner_bottom = table_area
+        .y
+        .saturating_add(table_area.height)
+        .saturating_sub(1); // exclusive of bottom border
+    // Header is one line at the top of the inner area.
+    let body_y = inner_y.saturating_add(1);
+    if row < body_y || row >= inner_bottom {
+        return None;
+    }
+    let visible = (row - body_y) as usize;
+    let idx = offset.saturating_add(visible);
+    if idx < row_count {
+        Some(idx)
+    } else {
+        None
     }
 }
 
@@ -508,11 +696,15 @@ fn draw(f: &mut ratatui::Frame<'_>, st: &mut HopState) {
         );
     }
 
+    st.table_area = chunks[1];
     match st.screen {
         Screen::Projects => draw_projects(f, chunks[1], st),
         Screen::Agents => draw_agents(f, chunks[1], st),
         Screen::Sessions => draw_sessions(f, chunks[1], st),
-        Screen::PathInput => draw_path_input(f, chunks[1], st),
+        Screen::PathInput => {
+            st.table_area = Rect::default();
+            draw_path_input(f, chunks[1], st);
+        }
     }
 
     let status = st.status.as_deref().unwrap_or("");
@@ -526,17 +718,17 @@ fn draw(f: &mut ratatui::Frame<'_>, st: &mut HopState) {
             if st.project_rows.is_empty() {
                 "No projects  . = cwd  n/a = add path  Esc quit"
             } else {
-                "↑/↓  Enter open tools  . = cwd  n/a = path  Esc quit"
+                "↑/↓/wheel  click select  double-click open  . = cwd  n/a = path  Esc quit"
             }
         }
-        Screen::Agents => "↑/↓  Enter sessions  Esc back",
-        Screen::Sessions => "↑/↓  Enter open  n = new chat  Esc back",
+        Screen::Agents => "↑/↓/wheel  click select  double-click sessions  Esc back",
+        Screen::Sessions => "↑/↓/wheel  click select  double-click open  n = new  Esc back",
         Screen::PathInput => "Type path  Enter confirm  Esc cancel",
     };
     f.render_widget(Paragraph::new(help), chunks[3]);
 }
 
-fn draw_projects(f: &mut ratatui::Frame<'_>, area: ratatui::layout::Rect, st: &mut HopState) {
+fn draw_projects(f: &mut ratatui::Frame<'_>, area: Rect, st: &mut HopState) {
     let header = Row::new(vec![
         Cell::from("Name"),
         Cell::from("Path"),
@@ -573,7 +765,7 @@ fn draw_projects(f: &mut ratatui::Frame<'_>, area: ratatui::layout::Rect, st: &m
     f.render_stateful_widget(table, area, &mut st.project_state);
 }
 
-fn draw_agents(f: &mut ratatui::Frame<'_>, area: ratatui::layout::Rect, st: &mut HopState) {
+fn draw_agents(f: &mut ratatui::Frame<'_>, area: Rect, st: &mut HopState) {
     let proj = st
         .selected_project
         .as_ref()
@@ -615,7 +807,7 @@ fn draw_agents(f: &mut ratatui::Frame<'_>, area: ratatui::layout::Rect, st: &mut
     f.render_stateful_widget(table, area, &mut st.agent_state);
 }
 
-fn draw_sessions(f: &mut ratatui::Frame<'_>, area: ratatui::layout::Rect, st: &mut HopState) {
+fn draw_sessions(f: &mut ratatui::Frame<'_>, area: Rect, st: &mut HopState) {
     let proj = st
         .selected_project
         .as_ref()
@@ -716,5 +908,54 @@ pub fn resolve_user_path(input: &Path) -> Result<PathBuf> {
     match std::fs::canonicalize(&joined) {
         Ok(p) => Ok(crate::paths::normalize_path(&p)),
         Err(_) => Ok(joined),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn area(x: u16, y: u16, w: u16, h: u16) -> Rect {
+        Rect {
+            x,
+            y,
+            width: w,
+            height: h,
+        }
+    }
+
+    #[test]
+    fn click_maps_body_rows_with_border_and_header() {
+        // Table at (0,1) size 40x10:
+        // y=1 top border, y=2 header, y=3 first body row (index 0), ...
+        let a = area(0, 1, 40, 10);
+        assert_eq!(row_index_at_click(a, 5, 3, 0, 5), Some(0));
+        assert_eq!(row_index_at_click(a, 5, 4, 0, 5), Some(1));
+        assert_eq!(row_index_at_click(a, 5, 7, 0, 5), Some(4));
+    }
+
+    #[test]
+    fn click_ignores_header_and_borders() {
+        let a = area(0, 1, 40, 10);
+        assert_eq!(row_index_at_click(a, 5, 1, 0, 5), None); // top border
+        assert_eq!(row_index_at_click(a, 5, 2, 0, 5), None); // header
+        assert_eq!(row_index_at_click(a, 5, 10, 0, 5), None); // bottom border (y=1+10-1=10)
+        assert_eq!(row_index_at_click(a, 50, 3, 0, 5), None); // outside x
+    }
+
+    #[test]
+    fn click_respects_scroll_offset() {
+        let a = area(0, 0, 40, 8);
+        // body starts at y=2 (border+header), offset 3 → first visible is index 3
+        assert_eq!(row_index_at_click(a, 1, 2, 3, 20), Some(3));
+        assert_eq!(row_index_at_click(a, 1, 3, 3, 20), Some(4));
+    }
+
+    #[test]
+    fn click_past_last_row_is_none() {
+        let a = area(0, 0, 40, 12);
+        assert_eq!(row_index_at_click(a, 1, 2, 0, 2), Some(0));
+        assert_eq!(row_index_at_click(a, 1, 3, 0, 2), Some(1));
+        assert_eq!(row_index_at_click(a, 1, 4, 0, 2), None);
     }
 }

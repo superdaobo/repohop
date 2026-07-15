@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-07-15
+
+### Added
+
+- **Mouse support** in multi-level hop UI (project / tool / session tables):
+  - Left-click selects a row
+  - Double-click activates (same as Enter)
+  - Mouse wheel moves selection up/down
+
 ## [0.1.3] - 2026-07-14
 
 ### Added
